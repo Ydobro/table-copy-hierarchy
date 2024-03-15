@@ -1,5 +1,11 @@
 <template>
   <header></header>
 
-  <main></main>
+  <main>
+    <CopyTable />
+  </main>
 </template>
+
+<script setup>
+import CopyTable from '@/components/CopyTable/CopyTable.vue'
+</script>

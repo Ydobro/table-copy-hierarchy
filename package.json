@@ -11,6 +11,7 @@
     "format": "prettier --write src/"
   },
   "dependencies": {
+    "selectable.js": "^0.22.0",
     "vue": "^3.4.21"
   },
   "devDependencies": {
