@@ -18,14 +18,22 @@
             class="ui-selectable"
             :class="{
               'ui-copy-selected':
-                selectedItemsState?.value?.[laneIndex * fields.length + fieldIndex]
+                selectedItemsState?.value?.length &&
+                selectedItemsState?.value?.[laneIndex * fields.length + fieldIndex]?.selected
             }"
             :data-key="field.key"
+            :data-row="laneIndex"
+            :data-col="fieldIndex"
           >
-            <input type="text" v-model="items[laneIndex * fields.length + fieldIndex]" />
+            <input
+              ref="inputList"
+              type="text"
+              v-model="items[laneIndex][fieldIndex]"
+              class="form-control"
+            />
           </td>
           <td>
-            <button @click="onAddFieldClick">Add Field</button>
+            <button @click="onAddFieldClick">+ Add Field</button>
           </td>
         </tr>
       </tbody>
@@ -34,7 +42,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, onUnmounted } from 'vue'
+import { ref, toRaw, reactive, onMounted, onUnmounted } from 'vue'
 import { useEventListener } from '@/helpers/event'
 
 import Selectable from 'selectable.js' // See: https://mobius-studios.gitbook.io/selectable
@@ -46,10 +54,17 @@ onMounted(() => {
   selectable = new Selectable({
     container: '#list',
     filter: '.ui-selectable',
+    ignore: '.form-control',
     lasso: {
       border: '1px dashed rgba(0, 0, 0, 1)',
       backgroundColor: 'rgba(255, 255, 255, 0.4)'
     }
+  })
+
+  selectable.on('end', () => {
+    inputList.value.forEach((input) => {
+      input.blur()
+    })
   })
 })
 
@@ -70,15 +85,50 @@ useEventListener(document, 'keydown', (event) => {
 })
 
 const onCopyAction = () => {
-  selectedItemsState.value = selectable.getItems().map((el) => el.selected)
+  selectedItemsState.value = selectable.getItems().map(({ selected, node }) => ({ selected, node }))
   selectable.clear()
 }
 
 const onPasteAction = () => {
-  console.log('selectedItemsState', selectedItemsState.value)
+  const selectedItems = selectable.getSelectedItems()
+  const copyInfo = [...toRaw(selectedItemsState.value)]
+
+  if (!selectedItems?.length || !copyInfo?.length) return
+
+  const trueIndex = copyInfo.findIndex((el) => el.selected) // get first 'true' index
+  copyInfo.splice(0, trueIndex) // remove all 'false' items from the start
+
+  const trueIndexLast = copyInfo.findLastIndex((el) => el.selected) // get last 'true' index
+  copyInfo.splice(trueIndexLast + 1, copyInfo.length) // remove all 'false' items from the end
+
+  // Check the first cell keys - allow copy only for the same cells
+  const currentFirstKey = selectedItems[0].node.dataset.key
+  const copyFirstKey = copyInfo[0].node.dataset.key
+
+  if (currentFirstKey !== copyFirstKey) {
+    alert('Field to insert not equal with the selected field')
+    return
+  }
+
+  const startRow = selectedItems[0].node.dataset.row
+  selectedItems.forEach(({ node }) => {
+    const { key, row, col } = node.dataset
+
+    const sameKeyElements = copyInfo.filter((el) => el.node.dataset.key === key)
+    const elToInsertIndex = (row - startRow) % sameKeyElements.length
+    const elToInsert = sameKeyElements[elToInsertIndex]
+
+    const { row: insertRow, col: insertCol } = elToInsert.node.dataset
+
+    items[row][col] = items[insertRow][insertCol]
+  })
+
+  selectedItemsState.value = []
+  selectable.clear()
 }
 
 const tableElement = ref(null)
+const inputList = ref([])
 
 const lanes = Array.from({ length: 8 }, (_, i) => i + 1)
 const fields = reactive([
@@ -89,7 +139,9 @@ const fields = reactive([
   { key: 'sample', label: 'Sample' }
 ])
 
-const items = reactive(Array.from(lanes.length * fields.length))
+const items = reactive(
+  Array.from({ length: lanes.length }, () => Array.from({ length: fields.length }, () => ''))
+)
 
 let newFieldKey = 0
 const onAddFieldClick = () => {
@@ -136,15 +188,15 @@ const onAddFieldClick = () => {
   transition: 0.3s all;
 }
 
+.ui-copy-selected {
+  --color-cell-border: #ffc107;
+  --color-cell-background: #ffc10710;
+}
+
 .ui-selected,
 .ui-selecting {
   --color-cell-border: #86b7fe;
   --color-cell-background: #86b7fe10;
-}
-
-.ui-copy-selected {
-  --color-cell-border: #ffc107;
-  --color-cell-background: #ffc10710;
 }
 
 .ui-selectable:focus {
