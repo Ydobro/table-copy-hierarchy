@@ -118,9 +118,10 @@ const onPasteAction = () => {
     const elToInsertIndex = (row - startRow) % sameKeyElements.length
     const elToInsert = sameKeyElements[elToInsertIndex]
 
-    const { row: insertRow, col: insertCol } = elToInsert.node.dataset
-
-    items[row][col] = items[insertRow][insertCol]
+    if (elToInsert?.selected) {
+      const { row: insertRow, col: insertCol } = elToInsert.node.dataset
+      items[row][col] = items[insertRow][insertCol]
+    }
   })
 
   selectedItemsState.value = []
